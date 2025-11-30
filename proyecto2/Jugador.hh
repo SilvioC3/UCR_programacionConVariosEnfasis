@@ -1,0 +1,32 @@
+#ifndef JUGADOR_HH
+#define JUGADOR_HH
+
+#include <iostream>
+
+
+/// @brief 
+// Clase Jugador para controlar los movimientos y variables del jugador en si
+// Sets y gets basicos temporales para pruebas
+class Jugador 
+{
+    private:
+        int posicion;
+        int bateria;
+
+    public:
+        Jugador(int inicio = 0);
+
+        //sets y gets temporales
+        int getPosicion() const;
+        int getBateria() const;
+        void setPosicion(int p);
+        void setBateria(int b);
+
+
+        //metodos para controlar el jugador
+        void moverJugador(int destino, int costo);
+        void imprimirJugador() const;
+
+};
+
+#endif
