@@ -1,11 +1,13 @@
 #include "JuegoCon.hh"
+
 #include <fstream>
 #include <sstream>
 #include <string>  
 #include <iostream>
 
 
-JuegoCon::JuegoCon(int n)
+
+JuegoCon::JuegoCon(int n): isLooping(true)
 {
     this->nodos.resize(n);
     this->aristas.resize(n);
@@ -29,7 +31,10 @@ void JuegoCon::agregarArista(int nodoId, int vecino, int peso){
 
 void JuegoCon::accederNodo(int indiceNodo){
     NodoJuego temp = this->nodos[indiceNodo];
-    std::cout << "Nodo: " << temp.nombre << std::endl;
+    std::cout << "\nNodo: " << temp.nombre << std::endl;
+    std::cout << "Tipo: " << temp.tipo << std::endl;
+    std::cout << "recursos " << temp.recursos << std::endl;
+    this->verVecinos(indiceNodo);
 
 }
 
@@ -94,6 +99,7 @@ void JuegoCon::cargadorGrafo(const std::string& ruta)
         char coma;
         ss >> u >> coma >> v >> coma >> peso;
         this->agregarArista(u, v, peso);
+        this->agregarArista(v, u, peso);
     }
 
     archivo.close();
@@ -119,4 +125,60 @@ const std::vector<std::pair<int,int>>& JuegoCon::getVecinos(int nodo) const
 const NodoJuego& JuegoCon::getNodo(int id) const 
 {
     return nodos[id];
+}
+
+// ronda del juego
+void JuegoCon::ronda(Jugador * jugador)
+{
+    
+    
+    jugador->imprimirJugador();
+    //this->verVecinos(jugador->getPosicion());
+    int nodoActual = jugador->getPosicion();
+    this->accederNodo(nodoActual);
+
+    const NodoJuego& nodoStruct = this->getNodo(nodoActual);
+    //std::cout << "Tipo de nodo actual: " << nodoStruct.tipo << "\n";
+    //Imprime las rutas, este get se deberia poder usar para UI y logica futura
+    std::cout << "\nLas rutas disponibles desde el nodo " << nodoActual << "son: \n";
+    const auto& vecinos = this->getVecinos(nodoActual);
+    for (int i = 0; i < vecinos.size(); i++) 
+        {
+            std::cout << i+1 << ") Moverse al nodo " << vecinos[i].first << " (costo:" << vecinos[i].second << "%)\n";
+        }
+    
+    //UI temporal en terminal para una sola partida
+    std::cout << "Eliga una opcion: ";
+    int opcion;
+    std::cin >> opcion;
+    
+    int destino = vecinos[opcion-1].first;
+    int costo   = vecinos[opcion-1].second;
+    jugador->moverJugador(destino, costo);
+    std::cout << "\nSe ha movido hacia el nodo " << destino << " (Ha utilizado " << costo << "%d de bateria)\n";
+  
+    if( jugador->getBateria() <= 0 )
+    {
+        this->isLooping = false;
+
+    }
+
+}
+
+void JuegoCon::gameLoop(Jugador * jugador)
+{
+    std::cout << "\nEL JUEGO HA EMPEZADO\n";
+
+    while(this->isLooping ){
+        this->ronda(jugador);
+
+    }
+
+    if (jugador->getBateria() <= 0){
+        std::cout << "\njuego perdido\n";
+
+    }else{
+         std::cout << "\njuego ganado\n";
+    }
+
 }

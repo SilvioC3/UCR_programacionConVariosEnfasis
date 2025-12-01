@@ -44,9 +44,11 @@ int main(int argc, char const *argv[])
 {
     JuegoCon juego(0);
     juego.cargadorGrafo("Grafo.txt");
-    ronda(juego);
-    juego.accederNodo(5);
-    juego.verVecinos(5);
+    Jugador jugador(20);
+    juego.gameLoop(&jugador);
+    //ronda(juego);
+    //juego.accederNodo(5);
+    //juego.verVecinos(5);
     return 0;
 }
 

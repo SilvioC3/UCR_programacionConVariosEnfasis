@@ -12,6 +12,7 @@ class Jugador
     private:
         int posicion;
         int bateria;
+        int recursos;
 
     public:
         Jugador(int inicio = 0);
@@ -19,8 +20,10 @@ class Jugador
         //sets y gets temporales
         int getPosicion() const;
         int getBateria() const;
+        int getRecursos() const;
         void setPosicion(int p);
         void setBateria(int b);
+        void setRecusos(int r);
 
 
         //metodos para controlar el jugador

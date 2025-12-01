@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <vector>
+#include "Jugador.hh"
 
 enum tipoDeNodo {base, recurso, fabrica };
 
@@ -24,6 +25,8 @@ private:
     std::vector<NodoJuego> nodos;
     std::vector <std::vector< std::pair <int, int>>> aristas;
     int current;
+    bool isLooping;
+
 
 public:
     JuegoCon(int n);
@@ -36,6 +39,8 @@ public:
     int getPeso(int origen, int destino) const;
     const NodoJuego& getNodo(int id) const;
     const std::vector<std::pair<int,int>>& getVecinos(int nodo) const;
+    void ronda(Jugador * jugador);
+    void gameLoop(Jugador * jugador);
 };
 
 
