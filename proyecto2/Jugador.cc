@@ -29,12 +29,12 @@ void Jugador::setPosicion(int p)
 //set en 100 de momento
 void Jugador::setBateria(int b) 
 {
-    bateria = 100;
+   bateria = ((bateria+b) >= 100) ? 100 : (bateria + b);
 }
 
 void Jugador::setRecusos(int r)
 {
-    recursos = r;
+    recursos += r;
 }
 
 void Jugador::moverJugador(int destino, int costo) 
@@ -50,4 +50,51 @@ void Jugador::imprimirJugador() const
         std::cout << "La bateria restante es: " << bateria << "%\n";
         std::cout << "La recursos obtenidos: " << recursos << "%\n";
 
+}
+
+int Jugador::tomarAccion()
+{
+    std::cout << "\nDigite 1 para mover, 2 para crear maquina\n";
+    int accion;
+    std::cin >> accion; 
+    switch(accion){
+        case 1:
+            std::cout << "buscando nodos vecionos\n";
+            return accion;
+        case 2:
+            std::cout << "construyendo maquibna\n";
+            return accion;
+        default:
+            std::cout << "valor no valido\n";
+            return 0;
+    }
+
+}
+int Jugador::elegirMaquina()
+{
+    std::cout << "\nDigite 1 para maquina BFS, 2 para crear maquina prim, 3 para crear maquina diJkstra \n";
+    int accion;
+    std::cin >> accion; 
+    switch(accion){
+        case 1:
+            std::cout << "construyendo maquina BFS\n";
+            return accion;
+        case 2:
+            if (this-> recursos < 1){
+                std::cout << "insufiencientes recursos\n";
+                return 0;
+            }
+            std::cout << "construyendo maquina Prim\n";
+            return accion;
+        case 3:
+            if (this-> recursos < 3){
+                std::cout << "insufiencientes recursos\n";
+                return 0;
+            }
+            std::cout << "construyendo maquina Dijikstra\n\n";
+            return accion;
+        default:
+            std::cout << "valor no valido\n";
+            return 0;
+    }
 }

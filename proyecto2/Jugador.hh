@@ -25,6 +25,9 @@ class Jugador
         void setBateria(int b);
         void setRecusos(int r);
 
+        //metodos para toma de decisiones
+        int tomarAccion(); 
+        int elegirMaquina(); 
 
         //metodos para controlar el jugador
         void moverJugador(int destino, int costo);
