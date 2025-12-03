@@ -98,6 +98,8 @@ void JuegoCon::cargadorGrafo(const string& ruta)
         nodo.tipo = static_cast<tipoDeNodo>(tipoInt); 
         nodo.nombre = "Nodo " + to_string(id);
         nodo.recursos = recursos;
+        nodo.x = x;
+        nodo.y = y;
         this->agregarNodo(id, nodo);
         maxId = max(maxId, id);
     }

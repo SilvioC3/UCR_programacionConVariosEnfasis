@@ -14,7 +14,8 @@ struct NodoJuego
     std::string nombre; 
     int recursos;  
     //int arista temporal
-    //int x, y; // para interface grafica
+    int x;
+    int y;
 };
 
 
@@ -46,6 +47,7 @@ public:
     int maquinaBFS(int inicio, const std::vector<std::vector<std::pair<int,int>>> &adj); // buscador bfs
     int maquinaPRI(int inicio );
     int maquinaDJI(int inicio);
+    int numNodos() const { return static_cast<int>(nodos.size());}
 };
 
 
