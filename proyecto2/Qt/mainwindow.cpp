@@ -309,8 +309,13 @@ void MainWindow::moverJugador(int destino)
 
     bateria -= costo;
     ui->labelBateria->setText(QString("Bateria: %1").arg(bateria));
-    if (bateria <= 0 && juego.getNodo(destino).tipo != base) {
-        QMessageBox::warning(this, "GAME OVER", "Te quedaste sin bateria lejos de la base.\nHas perdido.");
+    if (bateria <= 0) {
+        if (bateria <= 0) {
+            QMessageBox::warning(this, "GAME OVER",
+                                 "Te quedaste sin bateria\nHas perdido.");
+                    QApplication::quit();
+            return;
+        }
         QApplication::quit();
         return;
     }
@@ -350,9 +355,9 @@ void MainWindow::moverJugador(int destino)
     }
 
     //game over
-    if (bateria <= 0 && juego.getNodo(destino).tipo != base) {
+    if (bateria <= 0) {
         QMessageBox::warning(this, "GAME OVER",
-                             "Te quedaste sin bateria lejos de la base.\nHas perdido.");
+                             "Te quedaste sin bateria\nHas perdido.");
         return;
     }
 
