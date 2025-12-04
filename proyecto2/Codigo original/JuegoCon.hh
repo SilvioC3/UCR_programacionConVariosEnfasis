@@ -5,7 +5,7 @@
 #include <vector>
 #include "Jugador.hh"
 
-enum tipoDeNodo {base, recurso, fabrica };
+enum tipoDeNodo {vacio, base, recurso, fabrica };
 
 struct NodoJuego
 {
@@ -47,6 +47,8 @@ public:
     int maquinaBFS(int inicio, const std::vector<std::vector<std::pair<int,int>>> &adj); // buscador bfs
     int maquinaPRI(int inicio );
     int maquinaDJI(int inicio);
+    int maquinaAstar(int inicio);
+     int numNodos() const { return static_cast<int>(nodos.size());}
 };
 
 

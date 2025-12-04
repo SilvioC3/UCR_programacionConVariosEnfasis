@@ -183,6 +183,11 @@ void JuegoCon::ronda(Jugador * jugador)
             break;
         }
         case 2:{
+            if (this->nodos[nodoActual].tipo == fabrica){
+                std::cout << "Nodo ya tiene una fabrica\n";
+                break;
+            }
+            this->nodos[nodoActual].tipo = fabrica;
             int recurso = this->getRecurso(nodoActual);  //recurso de nodo actual
             int maquina = jugador->elegirMaquina();
             int restaPorAristas = 0;
@@ -204,6 +209,11 @@ void JuegoCon::ronda(Jugador * jugador)
                     jugador->setRecusos(recurso - restaPorAristas);
                     break;
                 }
+                case 4:{ 
+                    restaPorAristas = maquinaAstar(nodoActual);
+                    jugador->setRecusos(recurso - restaPorAristas);
+                    break;
+                }
 
                 default:{
                     break;
@@ -218,7 +228,7 @@ void JuegoCon::ronda(Jugador * jugador)
 
     }
   
-    if( jugador->getBateria() <= 0 || jugador->getRecursos() >= 100)
+    if( jugador->getBateria() <= 0 || jugador->getRecursos() >= costoMotor)
     {
         this->isLooping = false;
 
@@ -250,6 +260,7 @@ int JuegoCon::getRecurso(int nodo)
     return recurso;
 }
 
+// maquina BFS
 int JuegoCon::maquinaBFS(int inicio, const vector<vector<pair<int,int>>> &adj) {
     int n = adj.size();
     vector<bool> visited(n, false);
@@ -291,6 +302,7 @@ int JuegoCon::maquinaBFS(int inicio, const vector<vector<pair<int,int>>> &adj) {
     
 }
 
+//maquina pri
 int JuegoCon::maquinaPRI(int inicio) {
 
     int n = this->aristas.size();
@@ -345,7 +357,7 @@ int JuegoCon::maquinaPRI(int inicio) {
 }
 
 
-
+//MAquina djikstra
 int JuegoCon::maquinaDJI(int inicio )
 {    
     const int INF = 1e9;
@@ -381,4 +393,66 @@ int JuegoCon::maquinaDJI(int inicio )
     // se suma la distancia ecnotrada
     return dist[0];
   
+}
+
+// metodo extra implementacion A*
+int JuegoCon::maquinaAstar(int inicio)
+{
+
+       const int meta = 0;
+    int n = this->aristas.size();
+
+    // creacion de la heuristica con BFS 
+    vector<int> h(n, INT_MAX);
+    queue<int> q;
+
+    h[meta] = 0;
+    q.push(meta);
+
+    while (!q.empty()) {
+        int u = q.front();
+        q.pop();
+
+        for (auto& edge : this->aristas[u]) {
+            int v = edge.first;
+            if (h[v] == INT_MAX) {
+                h[v] = h[u] + 1;  // distancia en número de aristas
+                q.push(v);
+            }
+        }
+    }
+   
+    vector<int> g(n, INT_MAX);
+
+    priority_queue<
+        pair<int,int>,
+        vector<pair<int,int>>,
+        greater<pair<int,int>>
+    > pq;
+
+    g[inicio] = 0;
+    pq.push({h[inicio], inicio});
+
+    while (!pq.empty()) {
+        auto [f, u] = pq.top();
+        pq.pop();
+
+        if (u == meta)
+            return g[u];   // <<--- costo final
+
+        for (auto& edge : this->aristas[u]) {
+            int v = edge.first;
+            int w = edge.second;
+
+            int nuevoG = g[u] + w;
+
+            if (nuevoG < g[v]) {
+                g[v] = nuevoG;
+                pq.push({nuevoG + h[v], v});
+            }
+        }
+    }
+
+    return INT_MAX; // si no hay camino
+
 }

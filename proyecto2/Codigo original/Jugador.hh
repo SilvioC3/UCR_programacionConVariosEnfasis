@@ -3,6 +3,9 @@
 
 #include <iostream>
 
+#define costoMotor 500
+#define costoPrim 50
+#define costoDijk 0
 
 /// @brief 
 // Clase Jugador para controlar los movimientos y variables del jugador en si

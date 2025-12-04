@@ -72,7 +72,7 @@ int Jugador::tomarAccion()
 }
 int Jugador::elegirMaquina()
 {
-    std::cout << "\nDigite 1 para maquina BFS, 2 para crear maquina prim, 3 para crear maquina diJkstra \n";
+    std::cout << "\nDigite 1 para maquina BFS, 2 para crear maquina prim, 3 para crear maquina diJkstra, 4 para Astar \n";
     int accion;
     std::cin >> accion; 
     switch(accion){
@@ -80,18 +80,25 @@ int Jugador::elegirMaquina()
             std::cout << "construyendo maquina BFS\n";
             return accion;
         case 2:
-            if (this-> recursos < 1){
+            if (this-> recursos < costoPrim){
                 std::cout << "insufiencientes recursos\n";
                 return 0;
             }
             std::cout << "construyendo maquina Prim\n";
             return accion;
         case 3:
-            if (this-> recursos < 3){
+            if (this-> recursos < costoDijk){
                 std::cout << "insufiencientes recursos\n";
                 return 0;
             }
             std::cout << "construyendo maquina Dijikstra\n\n";
+            return accion;
+        case 4:
+            if (this-> recursos < costoDijk){
+                std::cout << "insufiencientes recursos\n";
+                return 0;
+            }
+            std::cout << "construyendo maquina Astar\n\n";
             return accion;
         default:
             std::cout << "valor no valido\n";
