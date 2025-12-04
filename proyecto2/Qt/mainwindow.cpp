@@ -9,12 +9,16 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QLayout>
+#include <cmath>
 
+
+//setup del ui
     MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
-    juego(0) //constructor de JuegoCon, con esto empieza en 0
-{
+    juego(0)//constructor de JuegoCon, con esto empieza en 0
+    {
+
     ui->setupUi(this);
 
     //crea la escena y asocia el objeto graphicsView
@@ -26,11 +30,25 @@
     ui->labelRecursos->setText("Recursos: 0");
     ui->btnMotorPlasma->setEnabled(false);
 
-    totalRecursos = 0;
+    totalRecursos = 25;
     recursosRecolectados = 0;
 
-    //carga el grafo
-    juego.cargadorGrafo("Grafo.txt");
+    //carga el grafo, esta parte del codigo pregunta si se quiere hacer uno al azar o sacarlo del .txt
+    auto respuesta = QMessageBox::question(this,
+                                           "Generar grafo",
+                                           "¿Quieres generar un grafo aleatorio?\n"
+                                           "Si eliges 'No', se cargará desde archivo.",
+                                           QMessageBox::Yes | QMessageBox::No);
+
+    if (respuesta == QMessageBox::Yes) {
+        int numNodos = 10;
+        int minConexiones = 1;
+        int extraConexiones = 2;
+        juego.generaGrafoAleatorio(numNodos, minConexiones, extraConexiones);
+    } else {
+        juego.cargadorGrafo("Grafo.txt");
+    }
+
     posicionJugador = 0;
     bateria = 100;
     ui->labelBateria->setText(QString("Bateria: %1").arg(bateria));
@@ -43,21 +61,22 @@
     jugadorItem->setZValue(100);  // por encima de los nodos
     connect(ui->btnMotorPlasma, &QPushButton::clicked, this, [&]() {
 
-        if (totalRecursos < 700) {
+        if (totalRecursos < 1000) {
             QMessageBox::warning(this, "No se puede comprar",
                                  "No tienes suficientes recursos.");
             return;
         }
 
-        totalRecursos -= 700;
+        totalRecursos -= 1000;
         ui->labelRecursos->setText(QString("Recursos: %1").arg(totalRecursos));
         actualizarBotonPlasma();
 
         QMessageBox::information(this,
                                  "Victoria",
                                  "¡Has comprado el Motor de Plasma!\nHas ganado el juego.");
-
         QApplication::quit();
+        actualizarBotonPlasma();
+
     });
 }
 
@@ -66,9 +85,10 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+//dibuja el grafo
 void MainWindow::dibujarGrafo()
 {
-    //Limpia la escena excepto el jugador
+
     for (QGraphicsItem *item : scene->items()) {
         if (item != jugadorItem) {
             scene->removeItem(item);
@@ -79,19 +99,46 @@ void MainWindow::dibujarGrafo()
     int N = juego.numNodos();
     int r = 12;
 
-    //Dibuja las aristas
+    std::map<std::pair<int,int>, std::vector<int>> groups;
+    for (int u = 0; u < N; ++u) {
+        const NodoJuego &n = juego.getNodo(u);
+        groups[{n.x, n.y}].push_back(u);
+    }
+
+    std::vector<std::pair<float,float>> posAdjusted(N);
+    for (auto &g : groups) {
+        int origX = g.first.first;
+        int origY = g.first.second;
+        auto &vec = g.second;
+        int m = (int)vec.size();
+
+        if (m == 1) {
+            posAdjusted[vec[0]] = { (float)origX, (float)origY };
+        } else {
+            float radius = 10.0f + std::min(20, m * 2);
+            for (int i = 0; i < m; ++i) {
+                float angle = (2.0f * M_PI * i) / m;
+                float nx = origX + std::cos(angle) * radius;
+                float ny = origY + std::sin(angle) * radius;
+                posAdjusted[vec[i]] = { nx, ny };
+            }
+        }
+    }
+
     for (int u = 0; u < N; ++u) {
         const auto &vecs = juego.getVecinos(u);
         for (const auto &p : vecs) {
             int v = p.first;
             if (v < 0 || v >= N) continue;
 
+            float Ax = posAdjusted[u].first;
+            float Ay = posAdjusted[u].second;
+            float Bx = posAdjusted[v].first;
+            float By = posAdjusted[v].second;
+
             const NodoJuego &A = juego.getNodo(u);
             const NodoJuego &B = juego.getNodo(v);
-
-            //Comprueba si se uso la arista antes para no borrarlas
-
-            bool esDJ = false, esPRI = false, esBFS = false;
+            bool esDJ = false, esPRI = false, esBFS = false, esAStar = false;
             for (auto &camino : historialDJ) {
                 for (auto &e : camino) {
                     if ((e.first == u && e.second == v) ||
@@ -123,6 +170,17 @@ void MainWindow::dibujarGrafo()
                 }
                 if (esBFS) break;
             }
+            for (auto &camino : historialAStar) {
+                for (auto &e : camino) {
+                    if ((e.first == u && e.second == v) ||
+                        (e.first == v && e.second == u)) {
+                        esAStar = true;
+                        break;
+                    }
+                }
+                if (esAStar) break;
+            }
+
 
             QPen penLine(Qt::gray);
             penLine.setWidth(2);
@@ -139,24 +197,26 @@ void MainWindow::dibujarGrafo()
                 penLine.setColor(Qt::yellow);
                 penLine.setWidth(4);
             }
+            else if (esAStar) {
+                penLine.setColor(Qt::green);
+                penLine.setWidth(4);
+            }
 
-            scene->addLine(A.x, A.y, B.x, B.y, penLine);
+            scene->addLine(Ax, Ay, Bx, By, penLine);
 
-            // Peso de la arista
-            float mx = (A.x + B.x) / 2.0;
-            float my = (A.y + B.y) / 2.0;
+            float mx = (Ax + Bx) / 2.0f;
+            float my = (Ay + By) / 2.0f;
             auto *w = scene->addText(QString::number(p.second));
             w->setTransform(QTransform::fromScale(1, -1), true);
             QRectF bb = w->mapToScene(w->boundingRect()).boundingRect();
             w->setPos(mx - bb.width()/2, my + bb.height()/2);
         }
     }
-
-    // Dibuja los nodos
+//Dibuja cada nodo
     for (int u = 0; u < N; ++u) {
         const NodoJuego &n = juego.getNodo(u);
-        QBrush brush;
 
+        QBrush brush;
         if (n.tipo == 0)        // vacio
             brush = QBrush(Qt::lightGray);
         else if (n.tipo == 1)   // base
@@ -166,23 +226,26 @@ void MainWindow::dibujarGrafo()
         else
             brush = QBrush(Qt::red);
 
-        scene->addEllipse(n.x - r, n.y - r, r*2, r*2, QPen(Qt::black), brush);
+        float nx = posAdjusted[u].first;
+        float ny = posAdjusted[u].second;
+
+        scene->addEllipse(nx - r, ny - r, r*2, r*2, QPen(Qt::black), brush);
 
         auto *txt = scene->addText(QString::number(n.id));
         txt->setTransform(QTransform::fromScale(1, -1), true);
         QRectF bb = txt->mapToScene(txt->boundingRect()).boundingRect();
-        txt->setPos(n.x - bb.width()/2, n.y + bb.height()/2);
+        txt->setPos(nx - bb.width()/2, ny + bb.height()/2);
     }
 
     crearBotonesMovimiento();
     scene->setSceneRect(scene->itemsBoundingRect());
 }
-
 void MainWindow::onNodoClicked(int destino)
 {
     moverJugador(destino);
 }
 
+//Para crear los botones de movimiento
 void MainWindow::crearBotonesMovimiento()
 {
 
@@ -246,11 +309,12 @@ void MainWindow::moverJugador(int destino)
 
     bateria -= costo;
     ui->labelBateria->setText(QString("Bateria: %1").arg(bateria));
-    if (bateria <= 0) {
-        QMessageBox::warning(this, "GAME OVER",
-                             "Te quedaste sin bateria durante el camino.\nGAME OVER.");
+    if (bateria <= 0 && juego.getNodo(destino).tipo != base) {
+        QMessageBox::warning(this, "GAME OVER", "Te quedaste sin bateria lejos de la base.\nHas perdido.");
+        QApplication::quit();
         return;
     }
+
     posicionJugador = destino;
     //para el movimiento del jugador
     const NodoJuego &n = juego.getNodo(posicionJugador);
@@ -296,7 +360,7 @@ void MainWindow::moverJugador(int destino)
     crearBotonesMovimiento();
 }
 
-//Metodo para la funcionalidad de nodos de recurso
+//Metodo para la funcionalidad de los recurso
 void MainWindow::submenuRecurso()
 {
     QDialog dialog(this);
@@ -306,26 +370,73 @@ void MainWindow::submenuRecurso()
     QVBoxLayout *layout = new QVBoxLayout(&dialog);
 
     int nodo = posicionJugador;
+    int recursoNodo = juego.getNodo(nodo).recursos;
+    QLabel *lblInfo = new QLabel(
+        QString("Recursos en este nodo: %1").arg(recursoNodo)
+        );
+    layout->addWidget(lblInfo);
+    int costoBFS = 25;
+    int costoPRI = 50;
+    int costoDJI =  100;
+    int costoAStar = 130;
+    if (recursosOriginales.count(nodo) == 0) {
+        recursosOriginales[nodo] = recursoNodo;
+    }
+    auto rutaBFS = juego.getCaminoBFS(nodo);
+    for (auto &e : rutaBFS)
+        costoBFS += juego.getPeso(e.first, e.second);
+    auto rutaPRI = juego.getCaminoPRI(nodo);
+    for (auto &e : rutaPRI)
+        costoPRI += juego.getPeso(e.first, e.second);
 
-    int costoBFS = juego.maquinaBFS(nodo, juego.getAristas());
-    int costoPRI = juego.maquinaPRI(nodo);
-    int costoDJI = juego.maquinaDJI(nodo);
+    auto rutaDJ = juego.getCaminoDJ(nodo);
+    for (auto &e : rutaDJ)
+        costoDJI += juego.getPeso(e.first, e.second);
 
+    auto rutaAStar = juego.getCaminoAStar(nodo);
+
+    for (auto &e : rutaAStar)
+        costoAStar += juego.getPeso(e.first, e.second);
+
+
+    int recursoOriginal = recursosOriginales[nodo];
+
+    int gananciaBFS = recursoOriginal - costoBFS;
+    if (gananciaBFS < 0) gananciaBFS = 0;
+
+    int gananciaPRI = recursoOriginal - costoPRI;
+    if (gananciaPRI < 0) gananciaPRI = 0;
+
+    int gananciaDJI = recursoOriginal - costoDJI;
+    if (gananciaDJI < 0) gananciaDJI = 0;
+
+    int gananciaAStar = recursoOriginal - costoAStar;
+    if (gananciaAStar < 0) gananciaAStar = 0;
     //botones
     QPushButton *btnNivel1 = new QPushButton(
-        QString("Nivel 1 (BFS) - Costo: %1").arg(costoBFS), &dialog);
-
+        QString("Nivel 1 (BFS) - Costo máquina: 25 - Ganancia: %1")
+            .arg(gananciaBFS)
+        );
     QPushButton *btnNivel2 = new QPushButton(
-        QString("Nivel 2 (Greedy) - Costo: %1").arg(costoPRI), &dialog);
-
+        QString("Nivel 2 (Prim) - Costo máquina: 50 - Ganancia: %1")
+            .arg(gananciaPRI)
+        );
     QPushButton *btnNivel3 = new QPushButton(
-        QString("Nivel 3 (Dijkstra) - Costo: %1").arg(costoDJI), &dialog);
+        QString("Nivel 3 (Dijkstra) - Costo máquina: 100 - Ganancia: %1")
+            .arg(gananciaDJI)
+        );
 
-    QPushButton *btnSalir = new QPushButton("Regresar al menú de movimientos", &dialog);
+    QPushButton *btnNivel4 = new QPushButton(
+        QString("Nivel 4 (A*) - Costo: %1 - Ganancia: %2")
+            .arg(costoAStar)
+            .arg(gananciaAStar),
+        &dialog);
+    QPushButton *btnSalir = new QPushButton("Regresar al menu de movimientos", &dialog);
 
     layout->addWidget(btnNivel1);
     layout->addWidget(btnNivel2);
     layout->addWidget(btnNivel3);
+    layout->addWidget(btnNivel4);
     layout->addWidget(btnSalir);
 
     ui->labelRecursos->setText(QString("Recursos: %1").arg(totalRecursos));
@@ -335,26 +446,40 @@ void MainWindow::submenuRecurso()
 
         if (juego.getNivelMaquina(nodo) >= 1) {
             QMessageBox::warning(this, "No permitido",
-                                 "Ya existe una máquina de nivel igual o mayor en este nodo.");
+                                 "Ya existe una maquina de nivel igual o mayor en este nodo.");
             return;
         }
+
+        const int COSTO = 25;
+
+        if (totalRecursos < COSTO) {
+            QMessageBox::warning(this, "No se puede construir",
+                                 "No tienes suficientes recursos para construir esta maquina.");
+            return;
+        }
+
+        totalRecursos -= COSTO;
 
         auto ruta = juego.getCaminoBFS(nodo);
         if (ruta.empty()) return;
 
-        int costo = 0;
+        int costoRutas = 0;
         for (auto &e : ruta)
-            costo += juego.getPeso(e.first, e.second);
+            costoRutas += juego.getPeso(e.first, e.second);
 
-        int recursoNodo = juego.getNodo(nodo).recursos;
-        juego.vaciarRecursosNodo(nodo);
+        int recursoOriginal = recursosOriginales[nodo];
 
-        int enviados = recursoNodo - costo;
-        if (enviados < 0) enviados = 0;
+        int enviadosNuevo = recursoOriginal - costoRutas;
+        if (enviadosNuevo < 0) enviadosNuevo = 0;
+        int enviadosViejo = recursosGanadosPorNodo[nodo];
 
-        totalRecursos += enviados;
+        totalRecursos -= enviadosViejo;
+        totalRecursos += enviadosNuevo;
+
+        recursosGanadosPorNodo[nodo] = enviadosNuevo;
         ui->labelRecursos->setText(QString("Recursos: %1").arg(totalRecursos));
         actualizarBotonPlasma();
+
         historialBFS.erase(
             std::remove_if(historialBFS.begin(), historialBFS.end(),
                            [&](auto &cam){ return cam.front().first == nodo || cam.back().first == nodo; }),
@@ -362,7 +487,7 @@ void MainWindow::submenuRecurso()
             );
         historialBFS.push_back(ruta);
 
-       juego.setNivelMaquina(nodo, 1);
+        juego.setNivelMaquina(nodo, 1);
         maquinas.insert(nodo);
 
         dibujarGrafo();
@@ -372,42 +497,42 @@ void MainWindow::submenuRecurso()
 
     //Prim
     connect(btnNivel2, &QPushButton::clicked, [&]() {
-
         if (juego.getNivelMaquina(nodo) >= 2) {
             QMessageBox::warning(this, "No permitido",
                                  "Ya existe Prim o Dijkstra en este nodo.");
             return;
         }
+        const int COSTO = 50;
 
-        auto rutaPRI = juego.getCaminoPRI(nodo);
-        if (rutaPRI.empty()) return;
+        if (totalRecursos < COSTO) {
+            QMessageBox::warning(this, "No se puede construir",
+                                 "No tienes suficientes recursos para construir esta maquina.");
+            return;
+        }
 
-        int costo = 0;
-        for (auto &e : rutaPRI)
-            costo += juego.getPeso(e.first, e.second);
+        totalRecursos -= COSTO;
+        juego.maquinaPRI(nodo);
 
-        int recursoNodo = juego.getNodo(nodo).recursos;
-        juego.vaciarRecursosNodo(nodo);
-
-        int enviados = recursoNodo - costo;
-        if (enviados < 0) enviados = 0;
-        totalRecursos += enviados;
+        int recursoOriginal = recursosOriginales[nodo];
+        int enviadosNuevo = std::max(0, recursoOriginal - costoPRI);
+        int enviadosViejo = recursosGanadosPorNodo[nodo];
+        totalRecursos -= enviadosViejo;
+        totalRecursos += enviadosNuevo;
+        recursosGanadosPorNodo[nodo] = enviadosNuevo;
 
         ui->labelRecursos->setText(QString("Recursos: %1").arg(totalRecursos));
-
+        actualizarBotonPlasma();
 
         historialBFS.erase(
             std::remove_if(historialBFS.begin(), historialBFS.end(),
                            [&](auto &cam){ return cam.front().first == nodo || cam.back().first == nodo; }),
             historialBFS.end()
             );
-
         historialPRI.erase(
             std::remove_if(historialPRI.begin(), historialPRI.end(),
                            [&](auto &cam){ return cam.front().first == nodo || cam.back().first == nodo; }),
             historialPRI.end()
             );
-
         historialPRI.push_back(rutaPRI);
 
         juego.setNivelMaquina(nodo, 2);
@@ -418,32 +543,33 @@ void MainWindow::submenuRecurso()
     });
 
 
+
     //Dijkstra
     connect(btnNivel3, &QPushButton::clicked, [&]() {
-
         if (juego.getNivelMaquina(nodo) >= 3) {
             QMessageBox::warning(this, "No permitido",
                                  "Este nodo ya tiene Dijkstra.");
             return;
         }
+        const int COSTO = 100;
+        if (totalRecursos < COSTO) {
+            QMessageBox::warning(this, "No se puede construir",
+                                 "No tienes suficientes recursos para construir esta maquina.");
+            return;
+        }
+        totalRecursos -= COSTO;
+        juego.maquinaDJI(nodo);
 
-        auto rutaDJ = juego.getCaminoDJ(nodo);
-        if (rutaDJ.empty()) return;
-
-        int costo = 0;
-        for (auto &e : rutaDJ)
-            costo += juego.getPeso(e.first, e.second);
-
-        int recursoNodo = juego.getNodo(nodo).recursos;
-        juego.vaciarRecursosNodo(nodo);
-
-        int enviados = recursoNodo - costo;
-        if(enviados < 0) enviados = 0;
-        totalRecursos += enviados;
+        int recursoOriginal = recursosOriginales[nodo];
+        int enviadosNuevo = std::max(0, recursoOriginal - costoDJI);
+        int enviadosViejo = recursosGanadosPorNodo[nodo];
+        totalRecursos -= enviadosViejo;
+        totalRecursos += enviadosNuevo;
+        recursosGanadosPorNodo[nodo] = enviadosNuevo;
 
         ui->labelRecursos->setText(QString("Recursos: %1").arg(totalRecursos));
+        actualizarBotonPlasma();
 
-        // BORRAR BFS y PRIM anteriores de este nodo
         historialBFS.erase(
             std::remove_if(historialBFS.begin(), historialBFS.end(),
                            [&](auto &cam){ return cam.front().first == nodo || cam.back().first == nodo; }),
@@ -459,15 +585,61 @@ void MainWindow::submenuRecurso()
                            [&](auto &cam){ return cam.front().first == nodo || cam.back().first == nodo; }),
             historialDJ.end()
             );
-
         historialDJ.push_back(rutaDJ);
 
         juego.setNivelMaquina(nodo, 3);
         maquinas.insert(nodo);
+
         dibujarGrafo();
         dialog.accept();
     });
 
+    //A*
+    connect(btnNivel4, &QPushButton::clicked, [&]() {
+        if (juego.getNivelMaquina(nodo) >= 4) {
+            QMessageBox::warning(this, "No permitido",
+                                 "Este nodo ya tiene A*.");
+            return;
+        }
+
+        const int COSTO = 150;
+        if (totalRecursos < COSTO) {
+            QMessageBox::warning(this, "No se puede construir",
+                                 "No tienes suficientes recursos para construir esta maquina.");
+            return;
+        }
+
+        totalRecursos -= COSTO;
+
+
+        auto ruta = juego.getCaminoAStar(nodo);
+
+        int costoR = 0;
+        for (auto &e : ruta)
+            costoR += juego.getPeso(e.first, e.second);
+
+        int recursoOriginal = recursosOriginales[nodo];
+        int enviadosNuevo = std::max(0, recursoOriginal - costoR);
+        int enviadosViejo = recursosGanadosPorNodo[nodo];
+        totalRecursos = totalRecursos - enviadosViejo + enviadosNuevo;
+        recursosGanadosPorNodo[nodo] = enviadosNuevo;
+
+        ui->labelRecursos->setText(QString("Recursos: %1").arg(totalRecursos));
+        actualizarBotonPlasma();
+
+        historialAStar.erase(
+            std::remove_if(historialAStar.begin(), historialAStar.end(),
+                           [&](auto &cam){ return cam.front().first == nodo || cam.back().first == nodo; }),
+            historialAStar.end()
+            );
+        historialAStar.push_back(ruta);
+
+        juego.setNivelMaquina(nodo, 4);
+        maquinas.insert(nodo);
+
+        dibujarGrafo();
+        dialog.accept();
+    });
     connect(btnSalir, &QPushButton::clicked, [&]() {
         dialog.reject();
     });
@@ -486,3 +658,5 @@ void MainWindow::actualizarBotonPlasma()
 
     ui->btnMotorPlasma->setEnabled(permitir);
 }
+
+

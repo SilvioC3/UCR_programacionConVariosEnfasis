@@ -37,11 +37,12 @@ private:
     bool primerBFSGratis = true;
     int recursosBase = 0;
     std::map<int,int> nivelMaquina;
+    int maquinaAstar(int);
+    std::vector<int> parentAStar;
 
 public:
-       void vaciarRecursosNodo(int id);
-
-public:
+    void vaciarRecursosNodo(int id);
+    int ejecutarMaquinaAStar(int nodo);
     JuegoCon(int n);
     ~JuegoCon();
     void agregarNodo(int id, const NodoJuego& nodo);
@@ -68,9 +69,12 @@ public:
     void setNivelMaquina(int id, int nivel) {
         nivelMaquina[id] = nivel;
     }
+    void generaGrafoAleatorio(int n, int conexionesMinimas = 1, int conexionesExtras = 2);
+
     std::vector<std::pair<int,int>> getCaminoDJ(int inicio) const;
     std::vector<std::pair<int,int>> getCaminoBFS(int inicio) const;
     std::vector<std::pair<int,int>> getCaminoPRI(int inicio) const;
+    std::vector<std::pair<int,int>> getCaminoAStar(int inicio);
     const std::vector<std::vector<std::pair<int,int>>>& getAristas() const;
     int numNodos() const { return static_cast<int>(nodos.size());
 

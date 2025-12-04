@@ -20,6 +20,8 @@ public:
 
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+    void finalizarJuego(const QString &mensaje);
+    void reiniciarJuego();
 
 
 private:
@@ -42,12 +44,13 @@ private:
     std::vector<std::vector<std::pair<int,int>>> historialBFS;
     std::vector<std::vector<std::pair<int,int>>> historialPRI;
     std::vector<std::vector<std::pair<int,int>>> historialDJ;
+      std::vector<std::vector<std::pair<int,int>>> historialAStar;
     void actualizarBotonPlasma();
-
+    std::map<int, int> recursosOriginales;
+    std::map<int, int> recursosGanadosPorNodo;
 
 private slots:
     void onNodoClicked(int id);
-
 };
 
 #endif

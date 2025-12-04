@@ -7,6 +7,8 @@
 #include <queue>
 #include <climits>
 #include <functional>
+#include <random>
+#include <ctime>
 
 using namespace std;
 
@@ -257,6 +259,8 @@ void JuegoCon::gameLoop(Jugador * jugador)
 
 }
 
+
+//Metodo para sacar los recursos
 int JuegoCon::getRecurso(int nodo)
 {
     if (nodos[nodo].recursoReclamado)
@@ -265,6 +269,8 @@ int JuegoCon::getRecurso(int nodo)
     return nodos[nodo].recursos;
 }
 
+
+//Metodo para construir la maquina de BFS
 int JuegoCon::maquinaBFS(int inicio,
                          const std::vector<std::vector<std::pair<int,int>>> &adj)
 {
@@ -298,7 +304,6 @@ int JuegoCon::maquinaBFS(int inicio,
     for (int v = 0; parent[v] != -1; v = parent[v]) {
         int u = parent[v];
 
-        // Buscar peso de (u,v)
         for (auto &p : adj[u])
             if (p.first == v)
                 costoTotal += p.second;
@@ -311,6 +316,7 @@ int JuegoCon::maquinaBFS(int inicio,
     return costoTotal;
 }
 
+//Metodo para construir la maquina de prim
 int JuegoCon::maquinaPRI(int inicio) {
 
     int n = this->aristas.size();
@@ -318,7 +324,6 @@ int JuegoCon::maquinaPRI(int inicio) {
     vector<bool> inMST(n, false);
     vector<int> parent(n, -1);
 
-    // Min-heap: (key, node)
     priority_queue<pair<int,int>,
                    vector<pair<int,int>>,
                    greater<pair<int,int>>> pq;
@@ -342,13 +347,11 @@ int JuegoCon::maquinaPRI(int inicio) {
         }
     }
 
-    // Build MST adjacency list
     vector<vector<pair<int,int>>> mst(n);
     for (int v = 0; v < n; v++) {
         if (parent[v] != -1) {
             int u = parent[v];
             int w = 0;
-            // find weight of edge (u,v) in original graph
             for (auto &p : this->aristas[v])
                 if (p.first == u) { w = p.second; break; }
 
@@ -436,6 +439,7 @@ const std::vector<std::vector<std::pair<int,int>>>& JuegoCon::getAristas() const
     return aristas;
 }
 
+//Metodo para sacar el camino de Dijkstra
 std::vector<std::pair<int,int>> JuegoCon::getCaminoDJ(int inicio) const
 {
     const int INF = 1e9;
@@ -471,6 +475,7 @@ std::vector<std::pair<int,int>> JuegoCon::getCaminoDJ(int inicio) const
     return camino;
 }
 
+//Metodo para sacar el camino de bfs
 std::vector<std::pair<int,int>> JuegoCon::getCaminoBFS(int inicio) const
 {
     int n = aristas.size();
@@ -502,7 +507,7 @@ std::vector<std::pair<int,int>> JuegoCon::getCaminoBFS(int inicio) const
     return camino;
 }
 
-
+//Metodo para sacar el camino de PRIM
 std::vector<std::pair<int,int>> JuegoCon::getCaminoPRI(int inicio) const
 {
     int n = aristas.size();
@@ -539,7 +544,254 @@ std::vector<std::pair<int,int>> JuegoCon::getCaminoPRI(int inicio) const
     return camino;
 }
 
+// metodo extra implementacion A* con AI
+int JuegoCon::maquinaAstar(int inicio)
+{
+    const int meta = 0;
+
+    int n = aristas.size();
+    if (inicio < 0 || inicio >= n) return INT_MAX;
+    if (meta < 0 || meta >= n) return INT_MAX;
+
+    vector<int> h(n, INT_MAX);
+    queue<int> q;
+
+    h[meta] = 0;
+    q.push(meta);
+
+    while (!q.empty()) {
+        int u = q.front();
+        q.pop();
+
+        for (auto &edge : aristas[u]) {
+            int v = edge.first;
+            if (v < 0 || v >= n) continue;
+
+            if (h[v] == INT_MAX) {
+                h[v] = h[u] + 1;
+                q.push(v);
+            }
+        }
+    }
+
+    vector<int> g(n, INT_MAX);
+    parentAStar.assign(n, -1);
+
+    priority_queue<
+        pair<int,int>,
+        vector<pair<int,int>>,
+        greater<pair<int,int>>
+        > pq;
+
+    g[inicio] = 0;
+    pq.push({h[inicio], inicio});
+
+    while (!pq.empty()) {
+        auto [f, u] = pq.top();
+        pq.pop();
+
+        if (u == meta)
+            return g[u];
+
+        for (auto &edge : aristas[u]) {
+            int v = edge.first;
+            int w = edge.second;
+
+            if (v < 0 || v >= n) continue;
+            if (g[u] == INT_MAX) continue;
+
+            int nuevoG = g[u] + w;
+            if (nuevoG < g[v]) {
+                g[v] = nuevoG;
+                parentAStar[v] = u;
+
+                if (h[v] == INT_MAX) continue;
+
+            pq.push({nuevoG + h[v], v});
+            }
+        }
+    }
+
+    return INT_MAX;
+}
+
+//Metodo para sacar el camino de A*
+std::vector<std::pair<int,int>> JuegoCon::getCaminoAStar(int inicio)
+{
+    if (parentAStar.empty()) return {};
+
+    std::vector<std::pair<int,int>> camino;
+    int actual = inicio;
+
+    while (actual != 0) {
+        int p = parentAStar[actual];
+        if (p == -1) break;
+        camino.push_back({p, actual});
+        actual = p;
+    }
+
+    std::reverse(camino.begin(), camino.end());
+    return camino;
+}
+
+
+//metodo auxiliar paraA*
+int JuegoCon::ejecutarMaquinaAStar(int nodo) {
+    return maquinaAstar(nodo);
+}
+
+//Metodo auxiliar en manejo de nodos
 void JuegoCon::vaciarRecursosNodo(int id) {
     nodos[id].recursos = 0;
     nodos[id].recursoReclamado = true;
+}
+
+
+//Metodo para crear un grafo al azar, con una base y siempre deberia tener minimo 1500 recursos
+void JuegoCon::generaGrafoAleatorio(int n, int conexionesMinimas, int conexionesExtras)
+{
+    nodos.clear();
+    aristas.clear();
+    nodos.resize(n);
+    aristas.resize(n);
+
+    std::mt19937 rng(time(nullptr));
+    std::uniform_int_distribution<int> tipoRand(1, 2);
+    std::uniform_int_distribution<int> recursoRand(50, 300);
+    std::uniform_int_distribution<int> pesoRand(5, 30);
+
+    const int MAX_VECINOS = 3;
+    const float DISTANCIA_MAX = 150;
+    const int CENTRO_X = 200;
+    const int CENTRO_Y = 200;
+    const int RADIO_CIRCULO = 150;
+    const int RUIDO_POS = 50;
+
+    std::uniform_real_distribution<float> ruido(-RUIDO_POS, RUIDO_POS);
+
+    nodos[0].id = 0;
+    nodos[0].x = CENTRO_X + RADIO_CIRCULO + ruido(rng);
+    nodos[0].y = CENTRO_Y + RADIO_CIRCULO + ruido(rng);
+    nodos[0].tipo = base;
+    nodos[0].recursos = 0;
+
+    for (int i = 1; i < n; i++) {
+        float angulo = 2.0 * M_PI * i / n;
+        float baseX = CENTRO_X + RADIO_CIRCULO * cos(angulo);
+        float baseY = CENTRO_Y + RADIO_CIRCULO * sin(angulo);
+
+        float x = baseX + ruido(rng);
+        float y = baseY + ruido(rng);
+
+        nodos[i].id = i;
+        nodos[i].x = static_cast<int>(x);
+        nodos[i].y = static_cast<int>(y);
+
+        int tipoAux = tipoRand(rng);
+        nodos[i].tipo = static_cast<tipoDeNodo>(tipoAux);
+        nodos[i].recursos = 0;
+    }
+
+    // Asegurar al menos 1500 recursos en total distribuidos en fábricas
+    int recursos_totales = 0;
+    std::vector<int> indices_fabrica;
+
+    for (int i = 1; i < n; i++) {
+        if (nodos[i].tipo == fabrica) {
+            indices_fabrica.push_back(i);
+        }
+    }
+
+    if (indices_fabrica.empty() && n > 1) {
+        indices_fabrica.push_back(1);
+        nodos[1].tipo = fabrica;
+    }
+
+    int base_recurso = 1500 / (int)indices_fabrica.size();
+    int resto = 1500 % (int)indices_fabrica.size();
+
+    for (int idx : indices_fabrica) {
+        nodos[idx].recursos = base_recurso;
+        recursos_totales += base_recurso;
+    }
+
+    std::uniform_int_distribution<int> fabricaRand(0, (int)indices_fabrica.size() - 1);
+    while (recursos_totales < 1500) {
+        int idx = indices_fabrica[fabricaRand(rng)];
+        int incremento = std::min(10, 1500 - recursos_totales);
+        nodos[idx].recursos += incremento;
+        recursos_totales += incremento;
+    }
+
+    // Función para calcular distancia euclidiana
+    auto distancia = [&](int a, int b) {
+        int dx = nodos[a].x - nodos[b].x;
+        int dy = nodos[a].y - nodos[b].y;
+        return sqrt(dx * dx + dy * dy);
+    };
+
+    std::vector<int> grado(n, 0);
+
+    // Crear árbol mínimo simple conectando nodos consecutivos
+    for (int i = 0; i < n - 1; i++) {
+        int peso = pesoRand(rng);
+        aristas[i].push_back({i + 1, peso});
+        aristas[i + 1].push_back({i, peso});
+        grado[i]++;
+        grado[i + 1]++;
+    }
+
+    // Añadir conexiones extras respetando restricciones
+    std::uniform_int_distribution<int> nodoRand(0, n - 1);
+
+    int intentos = 0;
+    int maxIntentos = n * 10;
+    int conexionesAgregadas = 0;
+    int totalExtras = n * conexionesExtras;
+
+    while (conexionesAgregadas < totalExtras && intentos < maxIntentos) {
+        int u = nodoRand(rng);
+        int v = nodoRand(rng);
+
+        if (u == v) {
+            intentos++;
+            continue;
+        }
+
+        if (distancia(u, v) > DISTANCIA_MAX) {
+            intentos++;
+            continue;
+        }
+
+        if (grado[u] >= MAX_VECINOS || grado[v] >= MAX_VECINOS) {
+            intentos++;
+            continue;
+        }
+
+        bool existe = false;
+        for (auto &vecino : aristas[u]) {
+            if (vecino.first == v) {
+                existe = true;
+                break;
+            }
+        }
+
+        if (existe) {
+            intentos++;
+            continue;
+        }
+
+        int peso = pesoRand(rng);
+        aristas[u].push_back({v, peso});
+        aristas[v].push_back({u, peso});
+        grado[u]++;
+        grado[v]++;
+        conexionesAgregadas++;
+        intentos = 0;
+    }
+
+    cout << "Grafo aleatorio generado con " << n << " nodos, " << totalExtras << " conexiones extras, limitando grado máximo a "
+         << MAX_VECINOS << " y distancia máxima " << DISTANCIA_MAX << endl;
+    cout << "Base ubicada en nodo 0" << endl;
+    cout << "Recursos totales en fábricas: " << recursos_totales << endl;
 }
