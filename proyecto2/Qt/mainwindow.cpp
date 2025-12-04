@@ -33,6 +33,11 @@ MainWindow::MainWindow(QWidget *parent) :
 
     dibujarGrafo();
 
+    const NodoJuego &n = juego.getNodo(posicionJugador);
+    jugadorItem = scene->addEllipse(n.x - 6, n.y - 6, 12, 12,
+                                    QPen(Qt::black), QBrush(Qt::green));
+    jugadorItem->setZValue(100);  // por encima de los nodos
+
 }
 
 MainWindow::~MainWindow()
@@ -42,7 +47,12 @@ MainWindow::~MainWindow()
 
 void MainWindow::dibujarGrafo()
 {
-    scene->clear();
+    for (QGraphicsItem *item : scene->items()) {
+        if (item != jugadorItem) {
+            scene->removeItem(item);
+            delete item;
+        }
+    }
 
     int N = juego.numNodos();
     int r = 12;
@@ -98,6 +108,7 @@ void MainWindow::dibujarGrafo()
 
     }
 }
+
 void MainWindow::onNodoClicked(int destino)
 {
     moverJugador(destino);
@@ -131,13 +142,30 @@ void MainWindow::crearBotonesMovimiento()
         });
 
         lo->addWidget(btn);
+
+    }
+    //Opcion para recargar al 60% si el nodo tiene una maquina
+    if (maquinas.count(posicionJugador))
+    {
+        QPushButton *btnRec = new QPushButton("Recargar bateria (60%)");
+        connect(btnRec, &QPushButton::clicked, this, [&]() {
+
+            if (bateria < 60)
+                bateria = 60;
+
+            ui->labelBateria->setText(QString("Bateria: %1").arg(bateria));
+
+            QMessageBox::information(this, "Recarga",
+                                     "La bateria se ha recargado al 60%.");
+        });
+
+        lo->addWidget(btnRec);
     }
 }
 
 void MainWindow::moverJugador(int destino)
 {
-    ui->labelBateria->setText(QString("Bateria: %1").arg(bateria));
-    //costo del movimiento
+    //para sacar el costo
     int costo = -1;
     for (auto &p : juego.getVecinos(posicionJugador)) {
         if (p.first == destino) {
@@ -145,21 +173,46 @@ void MainWindow::moverJugador(int destino)
             break;
         }
     }
+    if (costo == -1) return;
 
-    if (costo == -1) {
-        qDebug() << "Movimiento ilegal";
+    bateria -= costo;
+    ui->labelBateria->setText(QString("Bateria: %1").arg(bateria));
+    if (bateria <= 0) {
+        QMessageBox::warning(this, "GAME OVER",
+                             "Te quedaste sin bateria durante el camino.\nGAME OVER.");
         return;
     }
-
-    // baja la bateria
-    bateria -= costo;
-    qDebug() << "BATERIA = " << bateria;
-
     posicionJugador = destino;
 
-    //Game over si se queda sin bateria
+    //para el movimiento del jugador
+    const NodoJuego &n = juego.getNodo(posicionJugador);
+    jugadorItem->setRect(n.x - 6, n.y - 6, 12, 12);
+    //si es base
+    if (n.tipo == 1)
+    {
+        bateria = 100;
+        ui->labelBateria->setText(QString("Bateria: %1").arg(bateria));
+
+        QMessageBox::information(this, "Base",
+                                 "Ha regresado a la base.\nLa bateria se ha restaurado al 100%!");
+    }
+
+    //si es recurso
+    else if (n.tipo == 2)
+    {
+        submenuRecurso();
+    }
+
+    //si es máquina construida
+    else if (maquinas.count(posicionJugador))
+    {
+        QMessageBox::information(this, "Maquina",
+                                 "Esta maquina puede recargar tu bateria hasta 60%.");
+    }
+
+    // game over
     if (bateria <= 0 && juego.getNodo(destino).tipo != base) {
-        QMessageBox::warning(this, "Derrota",
+        QMessageBox::warning(this, "GAME OVER",
                              "Te quedaste sin bateria lejos de la base.\nHas perdido.");
         return;
     }
@@ -167,3 +220,69 @@ void MainWindow::moverJugador(int destino)
     dibujarGrafo();
     crearBotonesMovimiento();
 }
+
+//Metodo para la funcionalidad de nodos de recurso
+void MainWindow::submenuRecurso()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle("Recurso encontrado");
+    dialog.setModal(true);
+
+    QVBoxLayout *layout = new QVBoxLayout(&dialog);
+
+    QPushButton *btnNivel1 = new QPushButton("Nivel 1 (BFS)", &dialog);
+    QPushButton *btnNivel2 = new QPushButton("Nivel 2 (Greedy)", &dialog);
+    QPushButton *btnNivel3 = new QPushButton("Nivel 3 (Dijkstra)", &dialog);
+    QPushButton *btnSalir   = new QPushButton("Regresar al menu de movimientos", &dialog);
+
+    layout->addWidget(btnNivel1);
+    layout->addWidget(btnNivel2);
+    layout->addWidget(btnNivel3);
+    layout->addWidget(btnSalir);
+
+    int nodo = posicionJugador;
+    int recurso = juego.getRecurso(nodo);
+
+    //Nivel 1: BFS
+    connect(btnNivel1, &QPushButton::clicked, [&]() {
+        int costo = juego.maquinaBFS(nodo, juego.getAristas());
+        int ganancia = recurso - costo;
+
+        QMessageBox::information(this, "Resultado BFS",
+                                 QString("Costo tuberia: %1\nRecurso: %2\nGanancia neta: %3")
+                                     .arg(costo).arg(recurso).arg(ganancia));
+        maquinas.insert(nodo);
+        dialog.accept();
+    });
+
+    //Nivel 2: greedy PRI
+    connect(btnNivel2, &QPushButton::clicked, [&]() {
+        int costo = juego.maquinaPRI(nodo);
+        int ganancia = recurso - costo;
+
+        QMessageBox::information(this, "Resultado Greedy",
+                                 QString("Costo tuberia: %1\nRecurso: %2\nGanancia neta: %3")
+                                     .arg(costo).arg(recurso).arg(ganancia));
+        maquinas.insert(nodo);
+        dialog.accept();
+    });
+
+    //Nivel 3: Dijkstra
+    connect(btnNivel3, &QPushButton::clicked, [&]() {
+        int costo = juego.maquinaDJI(nodo);
+        int ganancia = recurso - costo;
+
+        QMessageBox::information(this, "Resultado Dijkstra",
+                                 QString("Costo tuberia: %1\nRecurso: %2\nGanancia neta: %3")
+                                     .arg(costo).arg(recurso).arg(ganancia));
+        maquinas.insert(nodo);
+        dialog.accept();
+    });
+
+    connect(btnSalir, &QPushButton::clicked, [&]() {
+        dialog.reject();
+    });
+
+    dialog.exec();
+}
+

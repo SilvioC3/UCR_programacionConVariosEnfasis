@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <vector>
+#include <utility>
 #include "Jugador.hh"
 
 enum tipoDeNodo {base, recurso, fabrica };
@@ -12,10 +13,10 @@ struct NodoJuego
     int id;
     tipoDeNodo tipo;
     std::string nombre; 
-    int recursos;  
-    //int arista temporal
+    int recursos;
     int x;
     int y;
+    bool tieneMaquina = false;
 };
 
 
@@ -47,7 +48,10 @@ public:
     int maquinaBFS(int inicio, const std::vector<std::vector<std::pair<int,int>>> &adj); // buscador bfs
     int maquinaPRI(int inicio );
     int maquinaDJI(int inicio);
+    const std::vector<std::vector<std::pair<int,int>>>& getAristas() const;
     int numNodos() const { return static_cast<int>(nodos.size());}
+
+
 };
 
 

@@ -382,3 +382,8 @@ int JuegoCon::maquinaDJI(int inicio )
     return dist[0];
   
 }
+
+const std::vector<std::vector<std::pair<int,int>>>& JuegoCon::getAristas() const
+{
+    return aristas;
+}
