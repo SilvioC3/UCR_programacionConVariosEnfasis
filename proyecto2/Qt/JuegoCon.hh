@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include <utility>
+#include <map>
 #include "Jugador.hh"
 
 enum tipoDeNodo {base, recurso, fabrica };
@@ -17,8 +18,13 @@ struct NodoJuego
     int x;
     int y;
     bool tieneMaquina = false;
+    bool recursoReclamado = false;
 };
 
+struct ResultadoAlgoritmo {
+    int costo = 0;
+    std::vector<std::pair<int,int>> aristas;
+};
 
 class JuegoCon
 {
@@ -28,7 +34,12 @@ private:
     std::vector <std::vector< std::pair <int, int>>> aristas;
     int current;
     bool isLooping;
+    bool primerBFSGratis = true;
+    int recursosBase = 0;
+    std::map<int,int> nivelMaquina;
 
+public:
+       void vaciarRecursosNodo(int id);
 
 public:
     JuegoCon(int n);
@@ -44,12 +55,27 @@ public:
     void moverANodo(Jugador * jugador, int nodoActual);
     const std::vector<std::pair<int,int>>& getVecinos(int nodo) const;
     void ronda(Jugador * jugador);
+    std::vector<std::pair<int,int>> getCamino(int desde, int hasta) const;
     void gameLoop(Jugador * jugador);
     int maquinaBFS(int inicio, const std::vector<std::vector<std::pair<int,int>>> &adj); // buscador bfs
     int maquinaPRI(int inicio );
     int maquinaDJI(int inicio);
+    int getNivelMaquina(int id) const {
+        auto it = nivelMaquina.find(id);
+        if (it == nivelMaquina.end()) return 0;
+        return it->second;
+    }
+    void setNivelMaquina(int id, int nivel) {
+        nivelMaquina[id] = nivel;
+    }
+    std::vector<std::pair<int,int>> getCaminoDJ(int inicio) const;
+    std::vector<std::pair<int,int>> getCaminoBFS(int inicio) const;
+    std::vector<std::pair<int,int>> getCaminoPRI(int inicio) const;
     const std::vector<std::vector<std::pair<int,int>>>& getAristas() const;
-    int numNodos() const { return static_cast<int>(nodos.size());}
+    int numNodos() const { return static_cast<int>(nodos.size());
+
+
+    }
 
 
 };

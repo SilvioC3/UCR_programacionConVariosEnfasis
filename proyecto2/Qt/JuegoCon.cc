@@ -168,8 +168,8 @@ void JuegoCon::moverANodo(Jugador * jugador, int nodoActual)
 // ronda del juego
 void JuegoCon::ronda(Jugador * jugador)
 {
-    
-    
+
+
     jugador->imprimirJugador();
     int nodoActual = jugador->getPosicion();
     this->accederNodo(nodoActual, jugador);
@@ -182,40 +182,53 @@ void JuegoCon::ronda(Jugador * jugador)
             moverANodo(jugador, nodoActual);
             break;
         }
-        case 2:{
-            int recurso = this->getRecurso(nodoActual);  //recurso de nodo actual
+        case 2: {
+            int recurso = this->getRecurso(nodoActual);
             int maquina = jugador->elegirMaquina();
             int restaPorAristas = 0;
 
+            int nivelActual = nivelMaquina[nodoActual]; // 0,1,2,3
+
+            // REGLAS
+            if (maquina == 1 && nivelActual != 0) {
+                std::cout << "Ya existe una máquina. No puedes construir BFS.\n";
+                return;
+            }
+            if (maquina == 2 && nivelActual == 3) {
+                std::cout << "Este nodo ya tiene Dijkstra.\n";
+                return;
+            }
+            if (maquina == 3 && nivelActual == 3) {
+                std::cout << "Este nodo ya tiene Dijkstra.\n";
+                return;
+            }
+
             switch (maquina)
             {
-                case 1:{
-                    restaPorAristas = maquinaBFS(nodoActual, this->aristas);
-                    jugador->setRecusos(recurso - restaPorAristas);
-                    break;
-                }
-                case 2:{
-                    restaPorAristas = maquinaPRI(nodoActual);
-                    jugador->setRecusos(recurso - restaPorAristas);
-                    break;
-                }
-                case 3:{ 
-                    restaPorAristas = maquinaDJI(nodoActual);
-                    jugador->setRecusos(recurso - restaPorAristas);
-                    break;
-                }
+            case 1:
+                restaPorAristas = maquinaBFS(nodoActual, this->aristas);
+                jugador->setRecusos(recurso - restaPorAristas);
+                nivelMaquina[nodoActual] = 1;
+                break;
 
-                default:{
-                    break;
-                }
+            case 2:
+                restaPorAristas = maquinaPRI(nodoActual);
+                jugador->setRecusos(recurso - restaPorAristas);
+                nivelMaquina[nodoActual] = 2;
+                break;
+
+            case 3:
+                restaPorAristas = maquinaDJI(nodoActual);
+                jugador->setRecusos(recurso - restaPorAristas);
+                nivelMaquina[nodoActual] = 3;
+                break;
+
+            default:
+                break;
             }
 
             break;
         }
-        default:{
-            break;
-        }
-
     }
   
     if( jugador->getBateria() <= 0 || jugador->getRecursos() >= 100)
@@ -246,26 +259,30 @@ void JuegoCon::gameLoop(Jugador * jugador)
 
 int JuegoCon::getRecurso(int nodo)
 {
-    int recurso = this->nodos[nodo].recursos;
-    return recurso;
+    if (nodos[nodo].recursoReclamado)
+        return 0;
+    nodos[nodo].recursoReclamado = true;
+    return nodos[nodo].recursos;
 }
 
-int JuegoCon::maquinaBFS(int inicio, const vector<vector<pair<int,int>>> &adj) {
-    int n = adj.size();
-    vector<bool> visited(n, false);
-    vector<int> parent(n, -1);
+int JuegoCon::maquinaBFS(int inicio,
+                         const std::vector<std::vector<std::pair<int,int>>> &adj)
+{
+    int N = adj.size();
+    vector<bool> visited(N, false);
+    vector<int> parent(N, -1);
     queue<int> q;
 
     visited[inicio] = true;
     q.push(inicio);
 
+
     while (!q.empty()) {
         int u = q.front(); q.pop();
 
-        if (u == 0)
-            break;
+        if (u == 0) break;
 
-        for (auto [v, w] : adj[u]) {
+        for (auto &[v, w] : adj[u]) {
             if (!visited[v]) {
                 visited[v] = true;
                 parent[v] = u;
@@ -274,21 +291,24 @@ int JuegoCon::maquinaBFS(int inicio, const vector<vector<pair<int,int>>> &adj) {
         }
     }
 
-    int total = 0;
-    for (int at = 0; parent[at] != -1; at = parent[at]) {
-        int p = parent[at];
 
-        // search for weight p -> at
-        for (auto [to, w] : adj[p]) {
-            if (to == at) {
-                total += w;
-                break;
-            }
-        }
+    if (!visited[0]) return 0;
+
+    int costoTotal = 0;
+    for (int v = 0; parent[v] != -1; v = parent[v]) {
+        int u = parent[v];
+
+        // Buscar peso de (u,v)
+        for (auto &p : adj[u])
+            if (p.first == v)
+                costoTotal += p.second;
+    }
+    if (primerBFSGratis) {
+        primerBFSGratis = false;
+        return 0;
     }
 
-    return total;
-    
+    return costoTotal;
 }
 
 int JuegoCon::maquinaPRI(int inicio) {
@@ -322,32 +342,60 @@ int JuegoCon::maquinaPRI(int inicio) {
         }
     }
 
-    // Build MST this->aristasacency list
+    // Build MST adjacency list
     vector<vector<pair<int,int>>> mst(n);
-
     for (int v = 0; v < n; v++) {
         if (parent[v] != -1) {
             int u = parent[v];
             int w = 0;
-
-            // find weight of edge (u,v)
+            // find weight of edge (u,v) in original graph
             for (auto &p : this->aristas[v])
-                if (p.first == u) w = p.second;
+                if (p.first == u) { w = p.second; break; }
 
             mst[u].push_back({v, w});
             mst[v].push_back({u, w});
         }
     }
 
-    int total = maquinaBFS(inicio, mst);
-    return total;
+    vector<bool> visited(n, false);
+    vector<int> parMST(n, -1);
+    queue<int> q;
+    visited[inicio] = true;
+    q.push(inicio);
 
+    while (!q.empty()) {
+        int u = q.front(); q.pop();
+        if (u == 0) break;
+        for (auto &pw : mst[u]) {
+            int v = pw.first;
+            if (!visited[v]) {
+                visited[v] = true;
+                parMST[v] = u;
+                q.push(v);
+            }
+        }
+    }
+
+
+    if (!visited[0]) return 0;
+
+    int totalPeso = 0;
+    for (int v = 0; parMST[v] != -1; v = parMST[v]) {
+        int u = parMST[v];
+        for (auto &p : mst[u]) {
+            if (p.first == v) {
+                totalPeso += p.second;
+                break;
+            }
+        }
+    }
+    return totalPeso;
 }
 
 
 
 int JuegoCon::maquinaDJI(int inicio )
-{    
+{
     const int INF = 1e9;
 
     // Dijkstra from a single source
@@ -356,7 +404,7 @@ int JuegoCon::maquinaDJI(int inicio )
 
     // min-heap priority queue: (distance, node)
     priority_queue<pair<int,int>,
-         vector<pair<int,int>>, 
+         vector<pair<int,int>>,
             greater<pair<int,int>>> pq;
 
     dist[inicio] = 0;
@@ -380,10 +428,118 @@ int JuegoCon::maquinaDJI(int inicio )
 
     // se suma la distancia ecnotrada
     return dist[0];
-  
+
 }
 
 const std::vector<std::vector<std::pair<int,int>>>& JuegoCon::getAristas() const
 {
     return aristas;
+}
+
+std::vector<std::pair<int,int>> JuegoCon::getCaminoDJ(int inicio) const
+{
+    const int INF = 1e9;
+    int n = aristas.size();
+    std::vector<int> dist(n, INF), parent(n, -1);
+
+    priority_queue<pair<int,int>,
+                   vector<pair<int,int>>,
+                   greater<pair<int,int>>> pq;
+
+    dist[inicio] = 0;
+    pq.push({0, inicio});
+
+    while (!pq.empty()) {
+        auto [d, u] = pq.top();
+        pq.pop();
+        if (d > dist[u]) continue;
+
+        for (auto &[v, w] : aristas[u]) {
+            if (dist[u] + w < dist[v]) {
+                dist[v] = dist[u] + w;
+                parent[v] = u;
+                pq.push({dist[v], v});
+            }
+        }
+    }
+
+    // camino a la base
+    std::vector<std::pair<int,int>> camino;
+    for (int at = 0; parent[at] != -1; at = parent[at]) {
+        camino.push_back({parent[at], at});
+    }
+    return camino;
+}
+
+std::vector<std::pair<int,int>> JuegoCon::getCaminoBFS(int inicio) const
+{
+    int n = aristas.size();
+    std::vector<bool> visited(n, false);
+    std::vector<int> parent(n, -1);
+    std::queue<int> q;
+
+    visited[inicio] = true;
+    q.push(inicio);
+
+    while (!q.empty()) {
+        int u = q.front(); q.pop();
+        if (u == 0) break;
+
+        for (auto &p : aristas[u]) {
+            int v = p.first;
+            if (!visited[v]) {
+                visited[v] = true;
+                parent[v] = u;
+                q.push(v);
+            }
+        }
+    }
+
+    std::vector<std::pair<int,int>> camino;
+    for (int at = 0; parent[at] != -1; at = parent[at]) {
+        camino.push_back({parent[at], at});
+    }
+    return camino;
+}
+
+
+std::vector<std::pair<int,int>> JuegoCon::getCaminoPRI(int inicio) const
+{
+    int n = aristas.size();
+    std::vector<int> key(n, 1e9);
+    std::vector<int> parent(n, -1);
+    std::vector<bool> inMST(n, false);
+
+    priority_queue<pair<int,int>,
+                   vector<pair<int,int>>,
+                   greater<pair<int,int>>> pq;
+
+    key[inicio] = 0;
+    pq.push({0, inicio});
+
+    while (!pq.empty()) {
+        int u = pq.top().second; pq.pop();
+        if (inMST[u]) continue;
+        inMST[u] = true;
+
+        for (auto &[v, w] : aristas[u]) {
+            if (!inMST[v] && w < key[v]) {
+                key[v] = w;
+                parent[v] = u;
+                pq.push({key[v], v});
+            }
+        }
+    }
+
+    //camino a la base
+    std::vector<std::pair<int,int>> camino;
+    for (int at = 0; parent[at] != -1; at = parent[at]) {
+        camino.push_back({parent[at], at});
+    }
+    return camino;
+}
+
+void JuegoCon::vaciarRecursosNodo(int id) {
+    nodos[id].recursos = 0;
+    nodos[id].recursoReclamado = true;
 }
